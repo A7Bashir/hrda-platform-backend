@@ -1,212 +1,259 @@
-const express = require('express');
-const router = express.Router();
+const express = require('express')
+const multer = require('multer')
+const path = require('path')
+const fs = require('fs')
+const router = express.Router()
 
-// TODO: Import controllers and middleware when they're created
-// const contentController = require('../controllers/contentController');
-// const uploadMiddleware = require('../middleware/upload');
-// const authMiddleware = require('../middleware/auth');
-
-/**
- * @route   GET /api/content
- * @desc    Get all content
- * @access  Public (for now, will be protected later)
- */
-router.get('/', async (req, res) => {
-  try {
-    // TODO: Replace with actual database query
-    const content = [
-      {
-        contentId: 'content_001',
-        fileName: 'welcome_image.jpg',
-        contentType: 'image',
-        fileSize: 2048576, // 2MB
-        uploadDate: new Date().toISOString(),
-        uploadedBy: 'admin@company.com',
-        assignedRobots: ['ROBOT_001', 'ROBOT_002'],
-        status: 'active',
-        contentUrl: 'https://example.com/welcome_image.jpg'
-      },
-      {
-        contentId: 'content_002',
-        fileName: 'intro_video.mp4',
-        contentType: 'video',
-        fileSize: 52428800, // 50MB
-        uploadDate: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-        uploadedBy: 'admin@company.com',
-        assignedRobots: ['ROBOT_003', 'ROBOT_004'],
-        status: 'active',
-        contentUrl: 'https://example.com/intro_video.mp4'
-      }
-    ];
-
-    res.json({
-      success: true,
-      count: content.length,
-      data: content
-    });
-  } catch (error) {
-    console.error('Error fetching content:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch content'
-    });
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = 'uploads/'
+    // Create uploads directory if it doesn't exist
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true })
+    }
+    cb(null, uploadDir)
+  },
+  filename: function (req, file, cb) {
+    // Generate unique filename with timestamp
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname))
   }
-});
+})
 
-/**
- * @route   GET /api/content/:contentId
- * @desc    Get content by ID
- * @access  Public (for now, will be protected later)
- */
-router.get('/:contentId', async (req, res) => {
-  try {
-    const { contentId } = req.params;
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB limit
+  },
+  fileFilter: function (req, file, cb) {
+    // Allow only images and videos
+    const allowedTypes = /jpeg|jpg|png|gif|mp4|avi|mov|wmv/
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase())
+    const mimetype = allowedTypes.test(file.mimetype)
     
-    // TODO: Replace with actual database query
-    const content = {
-      contentId: contentId,
-      fileName: 'sample_content.jpg',
-      contentType: 'image',
-      fileSize: 1048576, // 1MB
-      uploadDate: new Date().toISOString(),
-      uploadedBy: 'admin@company.com',
-      assignedRobots: ['ROBOT_001'],
-      status: 'active',
-      contentUrl: 'https://example.com/sample_content.jpg',
-      metadata: {
-        width: 1920,
-        height: 1080,
-        duration: null,
-        format: 'JPEG'
-      }
-    };
+    if (mimetype && extname) {
+      return cb(null, true)
+    } else {
+      cb(new Error('Only image and video files are allowed!'))
+    }
+  }
+})
 
+// In-memory storage for content metadata (replace with database later)
+let contentStore = [
+  {
+    id: 'content_1',
+    name: 'Welcome Image',
+    type: 'image',
+    filename: 'welcome-image.jpg',
+    size: '2.1 MB',
+    uploadedAt: new Date('2024-01-15').toISOString(),
+    assignedRobots: ['robot_1', 'robot_2'],
+    status: 'active'
+  },
+  {
+    id: 'content_2',
+    name: 'Product Video',
+    type: 'video',
+    filename: 'product-demo.mp4',
+    size: '15.7 MB',
+    uploadedAt: new Date('2024-01-16').toISOString(),
+    assignedRobots: ['robot_1'],
+    status: 'active'
+  }
+]
+
+// GET /api/content - Get all content
+router.get('/', (req, res) => {
+  try {
     res.json({
       success: true,
-      data: content
-    });
+      count: contentStore.length,
+      data: contentStore
+    })
   } catch (error) {
-    console.error('Error fetching content:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch content'
-    });
+    })
   }
-});
+})
 
-/**
- * @route   POST /api/content/upload
- * @desc    Upload new content
- * @access  Public (for now, will be protected later)
- */
-router.post('/upload', async (req, res) => {
+// GET /api/content/:id - Get content by ID
+router.get('/:id', (req, res) => {
   try {
-    // TODO: Implement actual file upload with multer
-    const { fileName, contentType, fileSize, uploadedBy } = req.body;
+    const content = contentStore.find(c => c.id === req.params.id)
+    if (!content) {
+      return res.status(404).json({
+        success: false,
+        error: 'Content not found'
+      })
+    }
+    
+    res.json({
+      success: true,
+      data: content
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch content'
+    })
+  }
+})
 
-    if (!fileName || !contentType || !fileSize) {
+// POST /api/content - Upload new content
+router.post('/', upload.single('file'), (req, res) => {
+  try {
+    if (!req.file) {
       return res.status(400).json({
         success: false,
-        error: 'Missing required fields: fileName, contentType, fileSize'
-      });
+        error: 'No file uploaded'
+      })
     }
 
-    // TODO: Replace with actual file upload and database save
+    // Determine file type
+    const fileExt = path.extname(req.file.originalname).toLowerCase()
+    const isVideo = ['.mp4', '.avi', '.mov', '.wmv'].includes(fileExt)
+    
+    // Create content object
     const newContent = {
-      contentId: `content_${Date.now()}`,
-      fileName,
-      contentType,
-      fileSize: parseInt(fileSize),
-      uploadDate: new Date().toISOString(),
-      uploadedBy: uploadedBy || 'admin@company.com',
-      assignedRobots: [],
+      id: `content_${Date.now()}`,
+      name: req.body.name || req.file.originalname,
+      type: isVideo ? 'video' : 'image',
+      filename: req.file.filename,
+      originalName: req.file.originalname,
+      size: formatFileSize(req.file.size),
+      uploadedAt: new Date().toISOString(),
+      assignedRobots: req.body.assignedRobots ? JSON.parse(req.body.assignedRobots) : [],
       status: 'active',
-      contentUrl: `https://example.com/${fileName}`,
-      message: 'Content uploaded successfully (mock response)'
-    };
+      filePath: req.file.path
+    }
+
+    contentStore.push(newContent)
 
     res.status(201).json({
       success: true,
       message: 'Content uploaded successfully',
       data: newContent
-    });
+    })
   } catch (error) {
-    console.error('Error uploading content:', error);
+    console.error('Upload error:', error)
     res.status(500).json({
       success: false,
       error: 'Failed to upload content'
-    });
+    })
   }
-});
+})
 
-/**
- * @route   PUT /api/content/:contentId/assign
- * @desc    Assign content to robots
- * @access  Public (for now, will be protected later)
- */
-router.put('/:contentId/assign', async (req, res) => {
+// PUT /api/content/:id - Update content
+router.put('/:id', (req, res) => {
   try {
-    const { contentId } = req.params;
-    const { robotIds } = req.body;
+    const contentIndex = contentStore.findIndex(c => c.id === req.params.id)
+    if (contentIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: 'Content not found'
+      })
+    }
 
+    const updatedContent = {
+      ...contentStore[contentIndex],
+      ...req.body,
+      updatedAt: new Date().toISOString()
+    }
+
+    contentStore[contentIndex] = updatedContent
+
+    res.json({
+      success: true,
+      message: 'Content updated successfully',
+      data: updatedContent
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update content'
+    })
+  }
+})
+
+// DELETE /api/content/:id - Delete content
+router.delete('/:id', (req, res) => {
+  try {
+    const contentIndex = contentStore.findIndex(c => c.id === req.params.id)
+    if (contentIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: 'Content not found'
+      })
+    }
+
+    const content = contentStore[contentIndex]
+    
+    // Delete physical file if it exists
+    if (content.filePath && fs.existsSync(content.filePath)) {
+      fs.unlinkSync(content.filePath)
+    }
+
+    // Remove from store
+    contentStore.splice(contentIndex, 1)
+
+    res.json({
+      success: true,
+      message: 'Content deleted successfully'
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete content'
+    })
+  }
+})
+
+// POST /api/content/:id/assign - Assign content to robots
+router.post('/:id/assign', (req, res) => {
+  try {
+    const { robotIds } = req.body
     if (!robotIds || !Array.isArray(robotIds)) {
       return res.status(400).json({
         success: false,
-        error: 'robotIds must be an array'
-      });
+        error: 'robotIds array is required'
+      })
     }
 
-    // TODO: Replace with actual database update
-    const updatedContent = {
-      contentId,
-      assignedRobots: robotIds,
-      lastAssigned: new Date().toISOString(),
-      message: `Content assigned to ${robotIds.length} robot(s)`
-    };
+    const content = contentStore.find(c => c.id === req.params.id)
+    if (!content) {
+      return res.status(404).json({
+        success: false,
+        error: 'Content not found'
+      })
+    }
+
+    content.assignedRobots = robotIds
+    content.updatedAt = new Date().toISOString()
 
     res.json({
       success: true,
       message: 'Content assigned successfully',
-      data: updatedContent
-    });
+      data: content
+    })
   } catch (error) {
-    console.error('Error assigning content:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to assign content'
-    });
+    })
   }
-});
+})
 
-/**
- * @route   DELETE /api/content/:contentId
- * @desc    Delete content
- * @access  Public (for now, will be protected later)
- */
-router.delete('/:contentId', async (req, res) => {
-  try {
-    const { contentId } = req.params;
-    
-    // TODO: Replace with actual database deletion and file cleanup
-    const deletedContent = {
-      contentId,
-      status: 'deleted',
-      deletedAt: new Date().toISOString(),
-      message: 'Content deleted successfully'
-    };
+// Helper function to format file size
+function formatFileSize(bytes) {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
 
-    res.json({
-      success: true,
-      message: 'Content deleted successfully',
-      data: deletedContent
-    });
-  } catch (error) {
-    console.error('Error deleting content:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to delete content'
-    });
-  }
-});
-
-module.exports = router;
+module.exports = router
