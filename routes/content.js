@@ -135,7 +135,7 @@ router.post('/', upload.single('file'), (req, res) => {
       originalName: req.file.originalname,
       size: formatFileSize(req.file.size),
       uploadedAt: new Date().toISOString(),
-      assignedRobots: req.body.assignedRobots ? JSON.parse(req.body.assignedRobots) : [],
+      assignedRobots: req.body.assignedRobots ? req.body.assignedRobots.split(',').map(id => id.trim()) : [],
       status: 'active',
       filePath: req.file.path
     }
