@@ -1,192 +1,306 @@
-const express = require('express');
-const router = express.Router();
+const express = require('express')
+const router = express.Router()
 
-// TODO: Import controllers and middleware when they're created
-// const robotController = require('../controllers/robotController');
-// const authMiddleware = require('../middleware/auth');
+// In-memory storage for robots (replace with database later)
+let robotsStore = [
+  {
+    id: 'robot_1',
+    name: 'HRDA Robot Alpha',
+    status: 'online',
+    lastSeen: new Date().toISOString(),
+    currentContent: 'Welcome Image',
+    location: 'Main Lobby',
+    ipAddress: '192.168.1.100',
+    version: '1.0.0',
+    batteryLevel: 85,
+    uptime: '2 days, 5 hours'
+  },
+  {
+    id: 'robot_2',
+    name: 'HRDA Robot Beta',
+    status: 'offline',
+    lastSeen: new Date(Date.now() - 300000).toISOString(), // 5 minutes ago
+    currentContent: 'Product Video',
+    location: 'Conference Room',
+    ipAddress: '192.168.1.101',
+    version: '1.0.0',
+    batteryLevel: 0,
+    uptime: '0 days, 0 hours'
+  },
+  {
+    id: 'robot_3',
+    name: 'HRDA Robot Gamma',
+    status: 'online',
+    lastSeen: new Date().toISOString(),
+    currentContent: 'Welcome Image',
+    location: 'Reception',
+    ipAddress: '192.168.1.102',
+    version: '1.0.0',
+    batteryLevel: 92,
+    uptime: '1 day, 12 hours'
+  },
+  {
+    id: 'robot_4',
+    name: 'HRDA Robot Delta',
+    status: 'online',
+    lastSeen: new Date().toISOString(),
+    currentContent: 'Product Video',
+    location: 'Showroom',
+    ipAddress: '192.168.1.103',
+    version: '1.0.0',
+    batteryLevel: 78,
+    uptime: '3 days, 8 hours'
+  }
+]
 
-/**
- * @route   GET /api/robots
- * @desc    Get all robots
- * @access  Public (for now, will be protected later)
- */
-router.get('/', async (req, res) => {
+// GET /api/robots - Get all robots
+router.get('/', (req, res) => {
   try {
-    // TODO: Replace with actual controller call
-    const robots = [
-      {
-        robotId: 'ROBOT_001',
-        robotName: 'Reception Robot',
-        status: 'online',
-        lastSeen: new Date().toISOString(),
-        currentContent: {
-          contentId: 'default_welcome',
-          contentType: 'image',
-          contentUrl: 'https://example.com/default.jpg',
-          lastUpdated: new Date().toISOString()
-        }
-      },
-      {
-        robotId: 'ROBOT_002',
-        robotName: 'Info Robot',
-        status: 'online',
-        lastSeen: new Date().toISOString(),
-        currentContent: {
-          contentId: 'default_welcome',
-          contentType: 'image',
-          contentUrl: 'https://example.com/default.jpg',
-          lastUpdated: new Date().toISOString()
-        }
-      },
-      {
-        robotId: 'ROBOT_003',
-        robotName: 'Guide Robot',
-        status: 'offline',
-        lastSeen: new Date(Date.now() - 300000).toISOString(), // 5 minutes ago
-        currentContent: {
-          contentId: 'default_welcome',
-          contentType: 'image',
-          contentUrl: 'https://example.com/default.jpg',
-          lastUpdated: new Date(Date.now() - 300000).toISOString()
-        }
-      },
-      {
-        robotId: 'ROBOT_004',
-        robotName: 'Assistant Robot',
-        status: 'online',
-        lastSeen: new Date().toISOString(),
-        currentContent: {
-          contentId: 'default_welcome',
-          contentType: 'image',
-          contentUrl: 'https://example.com/default.jpg',
-          lastUpdated: new Date().toISOString()
-        }
-      }
-    ];
-
     res.json({
       success: true,
-      count: robots.length,
-      data: robots
-    });
+      count: robotsStore.length,
+      data: robotsStore
+    })
   } catch (error) {
-    console.error('Error fetching robots:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch robots'
-    });
+    })
   }
-});
+})
 
-/**
- * @route   GET /api/robots/:robotId
- * @desc    Get robot by ID
- * @access  Public (for now, will be protected later)
- */
-router.get('/:robotId', async (req, res) => {
+// GET /api/robots/:id - Get robot by ID
+router.get('/:id', (req, res) => {
   try {
-    const { robotId } = req.params;
+    const robot = robotsStore.find(r => r.id === req.params.id)
+    if (!robot) {
+      return res.status(404).json({
+        success: false,
+        error: 'Robot not found'
+      })
+    }
     
-    // TODO: Replace with actual database query
-    const robot = {
-      robotId: robotId,
-      robotName: `${robotId.replace('_', ' ')} Robot`,
-      status: 'online',
-      lastSeen: new Date().toISOString(),
-      currentContent: {
-        contentId: 'default_welcome',
-        contentType: 'image',
-        contentUrl: 'https://example.com/default.jpg',
-        lastUpdated: new Date().toISOString()
-      },
-      settings: {
-        autoUpdate: true,
-        updateInterval: 300000
-      }
-    };
-
     res.json({
       success: true,
       data: robot
-    });
+    })
   } catch (error) {
-    console.error('Error fetching robot:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch robot'
-    });
+    })
   }
-});
+})
 
-/**
- * @route   PUT /api/robots/:robotId/status
- * @desc    Update robot status
- * @access  Public (for now, will be protected later)
- */
-router.put('/:robotId/status', async (req, res) => {
+// PUT /api/robots/:id - Register or update robot
+router.put('/:id', (req, res) => {
   try {
-    const { robotId } = req.params;
-    const { status } = req.body;
+    const robotId = req.params.id
+    console.log(`🤖 Robot registration request for ID: ${robotId}`)
+    console.log(`📦 Request body:`, JSON.stringify(req.body, null, 2))
+    console.log(`🌐 Client IP: ${req.ip}`)
+    
+    const robotIndex = robotsStore.findIndex(r => r.id === robotId)
+    console.log(`🔍 Robot exists check: ${robotIndex === -1 ? 'NEW' : 'EXISTS'}`)
+    
+    if (robotIndex === -1) {
+      // Robot doesn't exist, create new one (registration)
+      console.log(`✅ Creating new robot: ${robotId}`)
+      const newRobot = {
+        id: robotId,
+        name: req.body.name || `Robot ${robotId}`,
+        status: 'online',
+        lastSeen: new Date().toISOString(),
+        currentContent: 'Welcome',
+        location: 'Unknown',
+        ipAddress: req.ip || 'Unknown',
+        version: '1.0.0',
+        batteryLevel: 100,
+        uptime: '0 days, 0 hours',
+        device: req.body.device || 'Unknown Device',
+        ...req.body
+      }
+      
+      robotsStore.push(newRobot)
+      console.log(`🎉 Robot registered successfully! Total robots: ${robotsStore.length}`)
+      
+      res.json({
+        success: true,
+        message: 'Robot registered successfully',
+        data: newRobot
+      })
+    } else {
+      // Robot exists, update it
+      console.log(`🔄 Updating existing robot: ${robotId}`)
+      const updatedRobot = {
+        ...robotsStore[robotIndex],
+        ...req.body,
+        lastSeen: new Date().toISOString()
+      }
 
-    if (!status || !['online', 'offline', 'error'].includes(status)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid status. Must be: online, offline, or error'
-      });
+      robotsStore[robotIndex] = updatedRobot
+      console.log(`✅ Robot updated successfully!`)
+
+      res.json({
+        success: true,
+        message: 'Robot updated successfully',
+        data: updatedRobot
+      })
     }
-
-    // TODO: Replace with actual database update
-    const updatedRobot = {
-      robotId,
-      status,
-      lastSeen: new Date().toISOString(),
-      message: `Robot status updated to ${status}`
-    };
-
-    res.json({
-      success: true,
-      data: updatedRobot
-    });
   } catch (error) {
-    console.error('Error updating robot status:', error);
+    console.error(`❌ Robot registration error:`, error)
     res.status(500).json({
       success: false,
-      error: 'Failed to update robot status'
-    });
+      error: 'Failed to register/update robot'
+    })
   }
-});
+})
 
-/**
- * @route   POST /api/robots/:robotId/heartbeat
- * @desc    Robot heartbeat to update last seen
- * @access  Public (for robot communication)
- */
-router.post('/:robotId/heartbeat', async (req, res) => {
+// POST /api/robots/:id/heartbeat - Robot heartbeat/status update
+router.post('/:id/heartbeat', (req, res) => {
   try {
-    const { robotId } = req.params;
-    const { status, currentContent } = req.body;
+    const robotId = req.params.id
+    const { status, currentContent, batteryLevel, uptime } = req.body
+    
+    console.log(`💓 Heartbeat received from robot: ${robotId}`)
+    console.log(`📊 Heartbeat data:`, JSON.stringify(req.body, null, 2))
+    
+    const robotIndex = robotsStore.findIndex(r => r.id === robotId)
+    
+    if (robotIndex === -1) {
+      console.log(`❌ Heartbeat failed - Robot not found: ${robotId}`)
+      return res.status(404).json({
+        success: false,
+        error: 'Robot not found'
+      })
+    }
 
-    // TODO: Replace with actual database update
-    const heartbeat = {
-      robotId,
-      status: status || 'online',
-      lastSeen: new Date().toISOString(),
-      currentContent: currentContent || null,
-      timestamp: new Date().toISOString()
-    };
+    const robot = robotsStore[robotIndex]
+    robot.status = status || robot.status
+    robot.currentContent = currentContent || robot.currentContent
+    robot.batteryLevel = batteryLevel !== undefined ? batteryLevel : robot.batteryLevel
+    robot.uptime = uptime || robot.uptime
+    robot.lastSeen = new Date().toISOString()
+
+    console.log(`✅ Heartbeat processed for robot: ${robotId}`)
+    console.log(`📱 Robot status: ${robot.status}, Battery: ${robot.batteryLevel}%`)
 
     res.json({
       success: true,
       message: 'Heartbeat received',
-      data: heartbeat
-    });
+      data: robot
+    })
   } catch (error) {
-    console.error('Error processing heartbeat:', error);
+    console.error(`❌ Heartbeat error for robot ${req.params.id}:`, error)
     res.status(500).json({
       success: false,
       error: 'Failed to process heartbeat'
-    });
+    })
   }
-});
+})
 
-module.exports = router;
+// POST /api/robots/:id/content - Update robot's current content
+router.post('/:id/content', (req, res) => {
+  try {
+    const { contentId, contentName } = req.body
+    const robotIndex = robotsStore.findIndex(r => r.id === req.params.id)
+    
+    if (robotIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: 'Robot not found'
+      })
+    }
+
+    const robot = robotsStore[robotIndex]
+    robot.currentContent = contentName || 'Unknown Content'
+    robot.lastSeen = new Date().toISOString()
+
+    res.json({
+      success: true,
+      message: 'Content updated successfully',
+      data: robot
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update content'
+    })
+  }
+})
+
+// GET /api/robots/status/summary - Get robots status summary
+router.get('/status/summary', (req, res) => {
+  try {
+    const totalRobots = robotsStore.length
+    const onlineRobots = robotsStore.filter(r => r.status === 'online').length
+    const offlineRobots = totalRobots - onlineRobots
+    
+    const summary = {
+      total: totalRobots,
+      online: onlineRobots,
+      offline: offlineRobots,
+      onlinePercentage: Math.round((onlineRobots / totalRobots) * 100),
+      lastUpdate: new Date().toISOString()
+    }
+
+    res.json({
+      success: true,
+      data: summary
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch status summary'
+    })
+  }
+})
+
+// POST /api/robots/bulk-update - Bulk update multiple robots
+router.post('/bulk-update', (req, res) => {
+  try {
+    const { updates } = req.body
+    
+    if (!updates || !Array.isArray(updates)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Updates array is required'
+      })
+    }
+
+    const results = []
+    
+    updates.forEach(update => {
+      const robotIndex = robotsStore.findIndex(r => r.id === update.robotId)
+      if (robotIndex !== -1) {
+        robotsStore[robotIndex] = {
+          ...robotsStore[robotIndex],
+          ...update.data,
+          lastSeen: new Date().toISOString()
+        }
+        results.push({
+          robotId: update.robotId,
+          status: 'updated'
+        })
+      } else {
+        results.push({
+          robotId: update.robotId,
+          status: 'not_found'
+        })
+      }
+    })
+
+    res.json({
+      success: true,
+      message: 'Bulk update completed',
+      data: results
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to process bulk update'
+    })
+  }
+})
+
+module.exports = router
