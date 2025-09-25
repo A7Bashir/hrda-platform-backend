@@ -106,7 +106,16 @@ router.get('/:id', (req, res) => {
 // POST /api/content - Upload new content
 router.post('/', upload.single('file'), (req, res) => {
   try {
+    console.log('📁 Content upload request received')
+    console.log('📦 Request body:', req.body)
+    console.log('📎 File info:', req.file ? {
+      originalname: req.file.originalname,
+      filename: req.file.filename,
+      size: req.file.size
+    } : 'No file')
+    
     if (!req.file) {
+      console.log('❌ No file uploaded')
       return res.status(400).json({
         success: false,
         error: 'No file uploaded'
@@ -120,7 +129,7 @@ router.post('/', upload.single('file'), (req, res) => {
     // Create content object
     const newContent = {
       id: `content_${Date.now()}`,
-      name: req.body.name || req.file.originalname,
+      name: req.body.title || req.body.name || req.file.originalname,
       type: isVideo ? 'video' : 'image',
       filename: req.file.filename,
       originalName: req.file.originalname,
@@ -132,6 +141,8 @@ router.post('/', upload.single('file'), (req, res) => {
     }
 
     contentStore.push(newContent)
+    console.log('✅ Content stored successfully:', newContent.id)
+    console.log('📊 Total content items:', contentStore.length)
 
     res.status(201).json({
       success: true,
