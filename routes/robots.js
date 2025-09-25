@@ -2,56 +2,7 @@ const express = require('express')
 const router = express.Router()
 
 // In-memory storage for robots (replace with database later)
-let robotsStore = [
-  {
-    id: 'robot_1',
-    name: 'HRDA Robot Alpha',
-    status: 'online',
-    lastSeen: new Date().toISOString(),
-    currentContent: 'Welcome Image',
-    location: 'Main Lobby',
-    ipAddress: '192.168.1.100',
-    version: '1.0.0',
-    batteryLevel: 85,
-    uptime: '2 days, 5 hours'
-  },
-  {
-    id: 'robot_2',
-    name: 'HRDA Robot Beta',
-    status: 'offline',
-    lastSeen: new Date(Date.now() - 300000).toISOString(), // 5 minutes ago
-    currentContent: 'Product Video',
-    location: 'Conference Room',
-    ipAddress: '192.168.1.101',
-    version: '1.0.0',
-    batteryLevel: 0,
-    uptime: '0 days, 0 hours'
-  },
-  {
-    id: 'robot_3',
-    name: 'HRDA Robot Gamma',
-    status: 'online',
-    lastSeen: new Date().toISOString(),
-    currentContent: 'Welcome Image',
-    location: 'Reception',
-    ipAddress: '192.168.1.102',
-    version: '1.0.0',
-    batteryLevel: 92,
-    uptime: '1 day, 12 hours'
-  },
-  {
-    id: 'robot_4',
-    name: 'HRDA Robot Delta',
-    status: 'online',
-    lastSeen: new Date().toISOString(),
-    currentContent: 'Product Video',
-    location: 'Showroom',
-    ipAddress: '192.168.1.103',
-    version: '1.0.0',
-    batteryLevel: 78,
-    uptime: '3 days, 8 hours'
-  }
-]
+let robotsStore = []
 
 // GET /api/robots - Get all robots
 router.get('/', (req, res) => {
