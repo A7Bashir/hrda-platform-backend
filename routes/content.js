@@ -3,6 +3,7 @@ const multer = require('multer')
 const path = require('path')
 const fs = require('fs')
 const router = express.Router()
+const { addUpdate } = require('../stores/updatesStore')
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -143,6 +144,26 @@ router.post('/', upload.single('file'), (req, res) => {
     contentStore.push(newContent)
     console.log('✅ Content stored successfully:', newContent.id)
     console.log('📊 Total content items:', contentStore.length)
+
+    // Create update for assigned robots
+    if (newContent.assignedRobots && newContent.assignedRobots.length > 0) {
+      const updateId = `update_${Date.now()}`
+      const update = {
+        id: updateId,
+        contentId: newContent.id,
+        contentName: newContent.name,
+        targetRobots: newContent.assignedRobots,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        priority: 'normal',
+        type: 'content_update'
+      }
+      
+      // Add to updates store
+      addUpdate(update)
+      console.log('📝 Creating update for robots:', newContent.assignedRobots)
+      console.log('📋 Update details:', update)
+    }
 
     res.status(201).json({
       success: true,

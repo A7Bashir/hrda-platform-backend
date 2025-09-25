@@ -1,13 +1,18 @@
 const express = require('express')
 const router = express.Router()
+const { getUpdatesStore, getUpdatesForRobot, markUpdateAsProcessed } = require('../stores/updatesStore')
 
 // In-memory storage for updates (replace with database later)
-let updatesStore = [
-  {
-    id: 'update_1',
-    contentId: 'content_1',
-    contentName: 'Welcome Image',
-    targetRobots: ['robot_1', 'robot_2'],
+let updatesStore = getUpdatesStore()
+
+// Add some initial updates for testing
+if (updatesStore.length === 0) {
+  updatesStore.push(
+    {
+      id: 'update_1',
+      contentId: 'content_1',
+      contentName: 'Welcome Image',
+      targetRobots: ['robot_1', 'robot_2'],
     status: 'completed',
     createdAt: new Date('2024-01-15T10:00:00Z').toISOString(),
     completedAt: new Date('2024-01-15T10:05:00Z').toISOString(),
@@ -25,7 +30,8 @@ let updatesStore = [
     priority: 'high',
     type: 'content_update'
   }
-]
+  )
+}
 
 // GET /api/updates - Get all updates
 router.get('/', (req, res) => {
