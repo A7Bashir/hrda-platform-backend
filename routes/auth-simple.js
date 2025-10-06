@@ -10,14 +10,14 @@ const testUsers = [
   {
     id: 'admin-1',
     username: 'admin',
-    password: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // A7sir123
+    password: 'A7sir123', // Plain text for testing
     name: 'System Administrator',
     role: 'admin'
   },
   {
     id: 'user-1',
     username: 'user',
-    password: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // AmeraAirport1324
+    password: 'AmeraAirport1324', // Plain text for testing
     name: 'Client User',
     role: 'operator'
   }
@@ -50,9 +50,8 @@ router.post('/login', [
       })
     }
 
-    // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.password)
-    if (!isValidPassword) {
+    // Verify password (simple comparison for testing)
+    if (password !== user.password) {
       return res.status(401).json({ 
         success: false, 
         message: 'Invalid username or password' 
