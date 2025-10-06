@@ -145,6 +145,64 @@ app.use((error, req, res, next) => {
   })
 })
 
+// Initialize users endpoint (for production setup)
+app.post('/api/init-users', async (req, res) => {
+  try {
+    const usersCollection = db.collection('users')
+    
+    // Check if users already exist
+    const existingUsers = await usersCollection.limit(1).get()
+    if (!existingUsers.empty) {
+      return res.json({ 
+        success: true, 
+        message: 'Users already exist',
+        count: existingUsers.size
+      })
+    }
+
+    const bcrypt = require('bcryptjs')
+    
+    // Default admin user
+    const adminPassword = await bcrypt.hash('A7sir123', 10)
+    const adminUser = {
+      username: 'admin',
+      password: adminPassword,
+      name: 'System Administrator',
+      role: 'admin',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdBy: 'system'
+    }
+
+    // Default client user
+    const clientPassword = await bcrypt.hash('AmeraAirport1324', 10)
+    const clientUser = {
+      username: 'user',
+      password: clientPassword,
+      name: 'Client User',
+      role: 'operator',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdBy: 'system'
+    }
+
+    // Create users
+    await usersCollection.add(adminUser)
+    await usersCollection.add(clientUser)
+
+    res.json({ 
+      success: true, 
+      message: 'Users created successfully',
+      users: ['admin', 'user']
+    })
+
+  } catch (error) {
+    console.error('Error initializing users:', error)
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    })
+  }
+})
+
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 HRDA Platform API running on port ${PORT}`)
@@ -153,4 +211,5 @@ app.listen(PORT, () => {
   console.log(`🤖 Robots endpoint: http://localhost:${PORT}/api/robots`)
   console.log(`📁 Content endpoint: http://localhost:${PORT}/api/content`)
   console.log(`🔄 Updates endpoint: http://localhost:${PORT}/api/updates`)
+  console.log(`👥 Init users: http://localhost:${PORT}/api/init-users`)
 })
