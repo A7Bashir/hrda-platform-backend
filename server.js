@@ -63,7 +63,7 @@ app.use('/assets', express.static(path.join(__dirname, '../frontend/dist/assets'
 app.use('/vite.svg', express.static(path.join(__dirname, '../frontend/dist/vite.svg')))
 
 // Routes
-app.use('/api/auth', require('./routes/auth').router)
+app.use('/api/auth', require('./routes/auth-simple').router)
 app.use('/api/robots', require('./routes/robots'))
 app.use('/api/content', require('./routes/content'))
 app.use('/api/updates', require('./routes/updates'))
