@@ -60,16 +60,12 @@ router.get('/:id', (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const robotId = req.params.id
-    console.log(`🤖 Robot registration request for ID: ${robotId}`)
-    console.log(`📦 Request body:`, JSON.stringify(req.body, null, 2))
-    console.log(`🌐 Client IP: ${req.ip}`)
     
     const robotRef = robotsCollection.doc(robotId)
     const robotDoc = await robotRef.get()
     
     if (!robotDoc.exists) {
       // Robot doesn't exist, create new one (registration)
-      console.log(`✅ Creating new robot: ${robotId}`)
       const newRobot = {
         name: req.body.name || `Robot ${robotId}`,
         status: 'online',
@@ -85,7 +81,6 @@ router.put('/:id', async (req, res) => {
       }
       
       await robotRef.set(newRobot)
-      console.log(`🎉 Robot registered successfully!`)
       
       res.json({
         success: true,
@@ -94,14 +89,12 @@ router.put('/:id', async (req, res) => {
       })
     } else {
       // Robot exists, update it
-      console.log(`🔄 Updating existing robot: ${robotId}`)
       const updateData = {
         ...req.body,
         lastSeen: new Date().toISOString()
       }
 
       await robotRef.update(updateData)
-      console.log(`✅ Robot updated successfully!`)
 
       // Get updated robot data
       const updatedDoc = await robotRef.get()
@@ -126,14 +119,11 @@ router.post('/:id/heartbeat', async (req, res) => {
     const robotId = req.params.id
     const { status, currentContent, batteryLevel, uptime } = req.body
     
-    console.log(`💓 Heartbeat received from robot: ${robotId}`)
-    console.log(`📊 Heartbeat data:`, JSON.stringify(req.body, null, 2))
     
     const robotRef = robotsCollection.doc(robotId)
     const robotDoc = await robotRef.get()
     
     if (!robotDoc.exists) {
-      console.log(`❌ Heartbeat failed - Robot not found: ${robotId}`)
       return res.status(404).json({
         success: false,
         error: 'Robot not found'
@@ -150,8 +140,6 @@ router.post('/:id/heartbeat', async (req, res) => {
 
     await robotRef.update(updateData)
 
-    console.log(`✅ Heartbeat processed for robot: ${robotId}`)
-    console.log(`📱 Robot status: ${updateData.status}, Battery: ${updateData.batteryLevel}%`)
 
     // Get updated robot data
     const updatedDoc = await robotRef.get()

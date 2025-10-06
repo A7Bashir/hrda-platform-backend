@@ -206,10 +206,4 @@ app.post('/api/init-users', async (req, res) => {
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 HRDA Platform API running on port ${PORT}`)
-  console.log(`📍 Health check: http://localhost:${PORT}/health`)
-  console.log(`📚 API docs: http://localhost:${PORT}/api`)
-  console.log(`🤖 Robots endpoint: http://localhost:${PORT}/api/robots`)
-  console.log(`📁 Content endpoint: http://localhost:${PORT}/api/content`)
-  console.log(`🔄 Updates endpoint: http://localhost:${PORT}/api/updates`)
-  console.log(`👥 Init users: http://localhost:${PORT}/api/init-users`)
 })

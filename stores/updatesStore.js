@@ -4,9 +4,7 @@ let updatesStore = []
 module.exports = {
   getUpdatesStore: () => updatesStore,
   addUpdate: (update) => {
-    updatesStore.push(update)
-    console.log('📝 Update added to store:', update.id)
-    console.log('📊 Total updates:', updatesStore.length)
+  updatesStore.push(update)
   },
   getUpdatesForRobot: (robotId) => {
     return updatesStore.filter(update => 
@@ -18,7 +16,6 @@ module.exports = {
     if (update) {
       update.status = 'processed'
       update.processedAt = new Date().toISOString()
-      console.log('✅ Update marked as processed:', updateId)
     }
   }
 }

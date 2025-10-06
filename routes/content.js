@@ -105,16 +105,7 @@ router.get('/:id', async (req, res) => {
 // POST /api/content - Upload new content
 router.post('/', upload.single('file'), async (req, res) => {
   try {
-    console.log('📁 Content upload request received')
-    console.log('📦 Request body:', req.body)
-    console.log('📎 File info:', req.file ? {
-      originalname: req.file.originalname,
-      filename: req.file.filename,
-      size: req.file.size
-    } : 'No file')
-    
     if (!req.file) {
-      console.log('❌ No file uploaded')
       return res.status(400).json({
         success: false,
         error: 'No file uploaded'
@@ -141,7 +132,6 @@ router.post('/', upload.single('file'), async (req, res) => {
 
     // Store in Firestore
     await contentCollection.doc(contentId).set(newContent)
-    console.log('✅ Content stored successfully in Firestore:', contentId)
 
     // Create update for assigned robots
     if (newContent.assignedRobots && newContent.assignedRobots.length > 0) {
@@ -159,8 +149,6 @@ router.post('/', upload.single('file'), async (req, res) => {
       
       // Add to updates store
       addUpdate(update)
-      console.log('📝 Creating update for robots:', newContent.assignedRobots)
-      console.log('📋 Update details:', update)
     }
 
     res.status(201).json({
@@ -379,7 +367,6 @@ router.post('/schedules', async (req, res) => {
 
     // Store in Firestore
     await schedulesCollection.doc(scheduleId).set(newSchedule)
-    console.log('✅ Schedule created successfully:', scheduleId)
 
     res.status(201).json({
       success: true,
@@ -514,7 +501,6 @@ router.post('/schedules/:id/execute', async (req, res) => {
       updatedAt: new Date().toISOString()
     })
 
-    console.log('✅ Schedule executed successfully:', req.params.id)
 
     res.json({
       success: true,
