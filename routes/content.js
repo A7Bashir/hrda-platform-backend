@@ -2,8 +2,14 @@ const express = require('express')
 const multer = require('multer')
 const path = require('path')
 const fs = require('fs')
+const admin = require('firebase-admin')
 const router = express.Router()
 const { addUpdate } = require('../stores/updatesStore')
+
+// Initialize Firestore
+const db = admin.firestore()
+const contentCollection = db.collection('content')
+const schedulesCollection = db.collection('schedules')
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -41,39 +47,27 @@ const upload = multer({
   }
 })
 
-// In-memory storage for content metadata (replace with database later)
-let contentStore = [
-  {
-    id: 'content_1',
-    name: 'Welcome Image',
-    type: 'image',
-    filename: 'welcome-image.jpg',
-    size: '2.1 MB',
-    uploadedAt: new Date('2024-01-15').toISOString(),
-    assignedRobots: ['robot_1', 'robot_2'],
-    status: 'active'
-  },
-  {
-    id: 'content_2',
-    name: 'Product Video',
-    type: 'video',
-    filename: 'product-demo.mp4',
-    size: '15.7 MB',
-    uploadedAt: new Date('2024-01-16').toISOString(),
-    assignedRobots: ['robot_1'],
-    status: 'active'
-  }
-]
+// Content data is now stored in Firestore
 
 // GET /api/content - Get all content
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
+    const snapshot = await contentCollection.get()
+    const content = []
+    snapshot.forEach(doc => {
+      content.push({
+        id: doc.id,
+        ...doc.data()
+      })
+    })
+    
     res.json({
       success: true,
-      count: contentStore.length,
-      data: contentStore
+      count: content.length,
+      data: content
     })
   } catch (error) {
+    console.error('Error fetching content:', error)
     res.status(500).json({
       success: false,
       error: 'Failed to fetch content'
@@ -82,10 +76,10 @@ router.get('/', (req, res) => {
 })
 
 // GET /api/content/:id - Get content by ID
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
-    const content = contentStore.find(c => c.id === req.params.id)
-    if (!content) {
+    const contentDoc = await contentCollection.doc(req.params.id).get()
+    if (!contentDoc.exists) {
       return res.status(404).json({
         success: false,
         error: 'Content not found'
@@ -94,9 +88,13 @@ router.get('/:id', (req, res) => {
     
     res.json({
       success: true,
-      data: content
+      data: {
+        id: contentDoc.id,
+        ...contentDoc.data()
+      }
     })
   } catch (error) {
+    console.error('Error fetching content:', error)
     res.status(500).json({
       success: false,
       error: 'Failed to fetch content'
@@ -105,7 +103,7 @@ router.get('/:id', (req, res) => {
 })
 
 // POST /api/content - Upload new content
-router.post('/', upload.single('file'), (req, res) => {
+router.post('/', upload.single('file'), async (req, res) => {
   try {
     console.log('📁 Content upload request received')
     console.log('📦 Request body:', req.body)
@@ -128,8 +126,8 @@ router.post('/', upload.single('file'), (req, res) => {
     const isVideo = ['.mp4', '.avi', '.mov', '.wmv'].includes(fileExt)
     
     // Create content object
+    const contentId = `content_${Date.now()}`
     const newContent = {
-      id: `content_${Date.now()}`,
       name: req.body.title || req.body.name || req.file.originalname,
       type: isVideo ? 'video' : 'image',
       filename: req.file.filename,
@@ -141,16 +139,16 @@ router.post('/', upload.single('file'), (req, res) => {
       filePath: req.file.path
     }
 
-    contentStore.push(newContent)
-    console.log('✅ Content stored successfully:', newContent.id)
-    console.log('📊 Total content items:', contentStore.length)
+    // Store in Firestore
+    await contentCollection.doc(contentId).set(newContent)
+    console.log('✅ Content stored successfully in Firestore:', contentId)
 
     // Create update for assigned robots
     if (newContent.assignedRobots && newContent.assignedRobots.length > 0) {
       const updateId = `update_${Date.now()}`
       const update = {
         id: updateId,
-        contentId: newContent.id,
+        contentId: contentId,
         contentName: newContent.name,
         targetRobots: newContent.assignedRobots,
         status: 'pending',
@@ -168,7 +166,10 @@ router.post('/', upload.single('file'), (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Content uploaded successfully',
-      data: newContent
+      data: {
+        id: contentId,
+        ...newContent
+      }
     })
   } catch (error) {
     console.error('Upload error:', error)
@@ -180,30 +181,36 @@ router.post('/', upload.single('file'), (req, res) => {
 })
 
 // PUT /api/content/:id - Update content
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
-    const contentIndex = contentStore.findIndex(c => c.id === req.params.id)
-    if (contentIndex === -1) {
+    const contentRef = contentCollection.doc(req.params.id)
+    const contentDoc = await contentRef.get()
+    
+    if (!contentDoc.exists) {
       return res.status(404).json({
         success: false,
         error: 'Content not found'
       })
     }
 
-    const updatedContent = {
-      ...contentStore[contentIndex],
+    const updateData = {
       ...req.body,
       updatedAt: new Date().toISOString()
     }
 
-    contentStore[contentIndex] = updatedContent
+    await contentRef.update(updateData)
+    const updatedDoc = await contentRef.get()
 
     res.json({
       success: true,
       message: 'Content updated successfully',
-      data: updatedContent
+      data: {
+        id: contentDoc.id,
+        ...updatedDoc.data()
+      }
     })
   } catch (error) {
+    console.error('Error updating content:', error)
     res.status(500).json({
       success: false,
       error: 'Failed to update content'
@@ -212,31 +219,34 @@ router.put('/:id', (req, res) => {
 })
 
 // DELETE /api/content/:id - Delete content
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
-    const contentIndex = contentStore.findIndex(c => c.id === req.params.id)
-    if (contentIndex === -1) {
+    const contentRef = contentCollection.doc(req.params.id)
+    const contentDoc = await contentRef.get()
+    
+    if (!contentDoc.exists) {
       return res.status(404).json({
         success: false,
         error: 'Content not found'
       })
     }
 
-    const content = contentStore[contentIndex]
+    const content = contentDoc.data()
     
     // Delete physical file if it exists
     if (content.filePath && fs.existsSync(content.filePath)) {
       fs.unlinkSync(content.filePath)
     }
 
-    // Remove from store
-    contentStore.splice(contentIndex, 1)
+    // Remove from Firestore
+    await contentRef.delete()
 
     res.json({
       success: true,
       message: 'Content deleted successfully'
     })
   } catch (error) {
+    console.error('Error deleting content:', error)
     res.status(500).json({
       success: false,
       error: 'Failed to delete content'
@@ -245,7 +255,7 @@ router.delete('/:id', (req, res) => {
 })
 
 // POST /api/content/:id/assign - Assign content to robots
-router.post('/:id/assign', (req, res) => {
+router.post('/:id/assign', async (req, res) => {
   try {
     const { robotIds } = req.body
     if (!robotIds || !Array.isArray(robotIds)) {
@@ -255,23 +265,34 @@ router.post('/:id/assign', (req, res) => {
       })
     }
 
-    const content = contentStore.find(c => c.id === req.params.id)
-    if (!content) {
+    const contentRef = contentCollection.doc(req.params.id)
+    const contentDoc = await contentRef.get()
+    
+    if (!contentDoc.exists) {
       return res.status(404).json({
         success: false,
         error: 'Content not found'
       })
     }
 
-    content.assignedRobots = robotIds
-    content.updatedAt = new Date().toISOString()
+    const updateData = {
+      assignedRobots: robotIds,
+      updatedAt: new Date().toISOString()
+    }
+
+    await contentRef.update(updateData)
+    const updatedDoc = await contentRef.get()
 
     res.json({
       success: true,
       message: 'Content assigned successfully',
-      data: content
+      data: {
+        id: contentDoc.id,
+        ...updatedDoc.data()
+      }
     })
   } catch (error) {
+    console.error('Error assigning content:', error)
     res.status(500).json({
       success: false,
       error: 'Failed to assign content'
@@ -287,5 +308,233 @@ function formatFileSize(bytes) {
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
+
+// ==================== SCHEDULING ROUTES ====================
+
+// GET /api/content/schedules - Get all schedules
+router.get('/schedules', async (req, res) => {
+  try {
+    const snapshot = await schedulesCollection.get()
+    const schedules = []
+    snapshot.forEach(doc => {
+      schedules.push({
+        id: doc.id,
+        ...doc.data()
+      })
+    })
+    
+    res.json({
+      success: true,
+      count: schedules.length,
+      data: schedules
+    })
+  } catch (error) {
+    console.error('Error fetching schedules:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch schedules'
+    })
+  }
+})
+
+// POST /api/content/schedules - Create new schedule
+router.post('/schedules', async (req, res) => {
+  try {
+    const {
+      contentId,
+      name,
+      description,
+      scheduledDate,
+      scheduledTime,
+      targetRobots,
+      scheduleType, // 'once', 'daily', 'weekly', 'monthly'
+      recurrencePattern, // For recurring schedules
+      status // 'pending', 'active', 'completed', 'cancelled'
+    } = req.body
+
+    // Validate required fields
+    if (!contentId || !scheduledDate || !scheduledTime || !targetRobots) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: contentId, scheduledDate, scheduledTime, targetRobots'
+      })
+    }
+
+    // Create schedule object
+    const scheduleId = `schedule_${Date.now()}`
+    const newSchedule = {
+      contentId,
+      name: name || `Schedule for ${contentId}`,
+      description: description || '',
+      scheduledDate,
+      scheduledTime,
+      targetRobots: Array.isArray(targetRobots) ? targetRobots : [targetRobots],
+      scheduleType: scheduleType || 'once',
+      recurrencePattern: recurrencePattern || null,
+      status: status || 'pending',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      executedAt: null
+    }
+
+    // Store in Firestore
+    await schedulesCollection.doc(scheduleId).set(newSchedule)
+    console.log('✅ Schedule created successfully:', scheduleId)
+
+    res.status(201).json({
+      success: true,
+      message: 'Schedule created successfully',
+      data: {
+        id: scheduleId,
+        ...newSchedule
+      }
+    })
+  } catch (error) {
+    console.error('Error creating schedule:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create schedule'
+    })
+  }
+})
+
+// PUT /api/content/schedules/:id - Update schedule
+router.put('/schedules/:id', async (req, res) => {
+  try {
+    const scheduleRef = schedulesCollection.doc(req.params.id)
+    const scheduleDoc = await scheduleRef.get()
+    
+    if (!scheduleDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        error: 'Schedule not found'
+      })
+    }
+
+    const updateData = {
+      ...req.body,
+      updatedAt: new Date().toISOString()
+    }
+
+    await scheduleRef.update(updateData)
+    const updatedDoc = await scheduleRef.get()
+
+    res.json({
+      success: true,
+      message: 'Schedule updated successfully',
+      data: {
+        id: scheduleDoc.id,
+        ...updatedDoc.data()
+      }
+    })
+  } catch (error) {
+    console.error('Error updating schedule:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update schedule'
+    })
+  }
+})
+
+// DELETE /api/content/schedules/:id - Delete schedule
+router.delete('/schedules/:id', async (req, res) => {
+  try {
+    const scheduleRef = schedulesCollection.doc(req.params.id)
+    const scheduleDoc = await scheduleRef.get()
+    
+    if (!scheduleDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        error: 'Schedule not found'
+      })
+    }
+
+    await scheduleRef.delete()
+
+    res.json({
+      success: true,
+      message: 'Schedule deleted successfully'
+    })
+  } catch (error) {
+    console.error('Error deleting schedule:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete schedule'
+    })
+  }
+})
+
+// POST /api/content/schedules/:id/execute - Execute schedule immediately
+router.post('/schedules/:id/execute', async (req, res) => {
+  try {
+    const scheduleRef = schedulesCollection.doc(req.params.id)
+    const scheduleDoc = await scheduleRef.get()
+    
+    if (!scheduleDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        error: 'Schedule not found'
+      })
+    }
+
+    const schedule = scheduleDoc.data()
+    
+    // Get the content
+    const contentDoc = await contentCollection.doc(schedule.contentId).get()
+    if (!contentDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        error: 'Content not found'
+      })
+    }
+
+    const content = contentDoc.data()
+
+    // Create update for assigned robots
+    const updateId = `update_${Date.now()}`
+    const update = {
+      id: updateId,
+      contentId: schedule.contentId,
+      contentName: content.name,
+      targetRobots: schedule.targetRobots,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      priority: 'high',
+      type: 'scheduled_content_update',
+      scheduleId: req.params.id
+    }
+    
+    // Add to updates store
+    addUpdate(update)
+
+    // Update schedule status
+    await scheduleRef.update({
+      status: 'completed',
+      executedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    })
+
+    console.log('✅ Schedule executed successfully:', req.params.id)
+
+    res.json({
+      success: true,
+      message: 'Schedule executed successfully',
+      data: {
+        scheduleId: req.params.id,
+        updateId: updateId,
+        content: {
+          id: contentDoc.id,
+          ...content
+        }
+      }
+    })
+  } catch (error) {
+    console.error('Error executing schedule:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Failed to execute schedule'
+    })
+  }
+})
 
 module.exports = router

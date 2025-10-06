@@ -1,18 +1,31 @@
 const express = require('express')
+const admin = require('firebase-admin')
 const router = express.Router()
 
-// In-memory storage for robots (replace with database later)
-let robotsStore = []
+// Initialize Firestore
+const db = admin.firestore()
+const robotsCollection = db.collection('robots')
 
 // GET /api/robots - Get all robots
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
+    const snapshot = await robotsCollection.get()
+    const robots = []
+    
+    snapshot.forEach(doc => {
+      robots.push({
+        id: doc.id,
+        ...doc.data()
+      })
+    })
+    
     res.json({
       success: true,
-      count: robotsStore.length,
-      data: robotsStore
+      count: robots.length,
+      data: robots
     })
   } catch (error) {
+    console.error('Error fetching robots:', error)
     res.status(500).json({
       success: false,
       error: 'Failed to fetch robots'
@@ -44,21 +57,20 @@ router.get('/:id', (req, res) => {
 })
 
 // PUT /api/robots/:id - Register or update robot
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const robotId = req.params.id
     console.log(`🤖 Robot registration request for ID: ${robotId}`)
     console.log(`📦 Request body:`, JSON.stringify(req.body, null, 2))
     console.log(`🌐 Client IP: ${req.ip}`)
     
-    const robotIndex = robotsStore.findIndex(r => r.id === robotId)
-    console.log(`🔍 Robot exists check: ${robotIndex === -1 ? 'NEW' : 'EXISTS'}`)
+    const robotRef = robotsCollection.doc(robotId)
+    const robotDoc = await robotRef.get()
     
-    if (robotIndex === -1) {
+    if (!robotDoc.exists) {
       // Robot doesn't exist, create new one (registration)
       console.log(`✅ Creating new robot: ${robotId}`)
       const newRobot = {
-        id: robotId,
         name: req.body.name || `Robot ${robotId}`,
         status: 'online',
         lastSeen: new Date().toISOString(),
@@ -72,30 +84,31 @@ router.put('/:id', (req, res) => {
         ...req.body
       }
       
-      robotsStore.push(newRobot)
-      console.log(`🎉 Robot registered successfully! Total robots: ${robotsStore.length}`)
+      await robotRef.set(newRobot)
+      console.log(`🎉 Robot registered successfully!`)
       
       res.json({
         success: true,
         message: 'Robot registered successfully',
-        data: newRobot
+        data: { id: robotId, ...newRobot }
       })
     } else {
       // Robot exists, update it
       console.log(`🔄 Updating existing robot: ${robotId}`)
-      const updatedRobot = {
-        ...robotsStore[robotIndex],
+      const updateData = {
         ...req.body,
         lastSeen: new Date().toISOString()
       }
 
-      robotsStore[robotIndex] = updatedRobot
+      await robotRef.update(updateData)
       console.log(`✅ Robot updated successfully!`)
 
+      // Get updated robot data
+      const updatedDoc = await robotRef.get()
       res.json({
         success: true,
         message: 'Robot updated successfully',
-        data: updatedRobot
+        data: { id: robotId, ...updatedDoc.data() }
       })
     }
   } catch (error) {
@@ -108,7 +121,7 @@ router.put('/:id', (req, res) => {
 })
 
 // POST /api/robots/:id/heartbeat - Robot heartbeat/status update
-router.post('/:id/heartbeat', (req, res) => {
+router.post('/:id/heartbeat', async (req, res) => {
   try {
     const robotId = req.params.id
     const { status, currentContent, batteryLevel, uptime } = req.body
@@ -116,9 +129,10 @@ router.post('/:id/heartbeat', (req, res) => {
     console.log(`💓 Heartbeat received from robot: ${robotId}`)
     console.log(`📊 Heartbeat data:`, JSON.stringify(req.body, null, 2))
     
-    const robotIndex = robotsStore.findIndex(r => r.id === robotId)
+    const robotRef = robotsCollection.doc(robotId)
+    const robotDoc = await robotRef.get()
     
-    if (robotIndex === -1) {
+    if (!robotDoc.exists) {
       console.log(`❌ Heartbeat failed - Robot not found: ${robotId}`)
       return res.status(404).json({
         success: false,
@@ -126,20 +140,25 @@ router.post('/:id/heartbeat', (req, res) => {
       })
     }
 
-    const robot = robotsStore[robotIndex]
-    robot.status = status || robot.status
-    robot.currentContent = currentContent || robot.currentContent
-    robot.batteryLevel = batteryLevel !== undefined ? batteryLevel : robot.batteryLevel
-    robot.uptime = uptime || robot.uptime
-    robot.lastSeen = new Date().toISOString()
+    const updateData = {
+      status: status || robotDoc.data().status,
+      currentContent: currentContent || robotDoc.data().currentContent,
+      batteryLevel: batteryLevel !== undefined ? batteryLevel : robotDoc.data().batteryLevel,
+      uptime: uptime || robotDoc.data().uptime,
+      lastSeen: new Date().toISOString()
+    }
+
+    await robotRef.update(updateData)
 
     console.log(`✅ Heartbeat processed for robot: ${robotId}`)
-    console.log(`📱 Robot status: ${robot.status}, Battery: ${robot.batteryLevel}%`)
+    console.log(`📱 Robot status: ${updateData.status}, Battery: ${updateData.batteryLevel}%`)
 
+    // Get updated robot data
+    const updatedDoc = await robotRef.get()
     res.json({
       success: true,
       message: 'Heartbeat received',
-      data: robot
+      data: { id: robotId, ...updatedDoc.data() }
     })
   } catch (error) {
     console.error(`❌ Heartbeat error for robot ${req.params.id}:`, error)

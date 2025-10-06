@@ -4,6 +4,17 @@ const helmet = require('helmet')
 const morgan = require('morgan')
 const rateLimit = require('express-rate-limit')
 const path = require('path')
+const admin = require('firebase-admin')
+
+// Initialize Firebase Admin SDK
+const serviceAccount = require('./serviceAccountKey.json')
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  projectId: 'hrda-463712'
+})
+
+const db = admin.firestore()
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -40,7 +51,12 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 
+// Serve React app static assets
+app.use('/assets', express.static(path.join(__dirname, '../frontend/dist/assets')))
+app.use('/vite.svg', express.static(path.join(__dirname, '../frontend/dist/vite.svg')))
+
 // Routes
+app.use('/api/auth', require('./routes/auth').router)
 app.use('/api/robots', require('./routes/robots'))
 app.use('/api/content', require('./routes/content'))
 app.use('/api/updates', require('./routes/updates'))
@@ -71,11 +87,22 @@ app.get('/api', (req, res) => {
   })
 })
 
-// 404 handler
-app.use('*', (req, res) => {
+// Serve React app for all non-API routes (for client-side routing)
+app.get('*', (req, res, next) => {
+  // Skip API routes
+  if (req.path.startsWith('/api/') || req.path.startsWith('/health')) {
+    return next()
+  }
+  
+  // Serve the React app for all other routes
+  res.sendFile(path.join(__dirname, '../frontend/dist/index.html'))
+})
+
+// 404 handler for API routes only
+app.use('/api/*', (req, res) => {
   res.status(404).json({
     success: false,
-    error: 'Endpoint not found',
+    error: 'API endpoint not found',
     availableEndpoints: [
       'GET /health',
       'GET /api',
